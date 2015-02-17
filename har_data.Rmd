@@ -1,0 +1,107 @@
+---
+output: html_document
+---
+ 
+## Weight Lifting Exercise Prediction with Human Activity Recognition Data - Coursera Data Science Specialization - Practical Machine Learning Course
+
+#### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+ 
+#### Executive Summary
+
+We use a subset of the full data set described at the link above as the training set for a random forest model. Using this model, we predict participant "Unilateral Dumbbell Biceps Curl" outcomes on the provided testing data set.
+
+#### Data Manipulation
+
+###### Loading Data
+
+We first load the training and testing data sets from the course website.
+
+```{r, cache=TRUE}
+download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+              "train.csv")
+train <- read.csv("train.csv", na.strings=c("NA","#DIV/0!", ""))
+
+download.file("http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+              "final_test.csv")
+final_test <- read.csv("final_test.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+###### Cleaning Data
+
+Since the original data sets have many fields which are blank or have errors, we used the na.strings argument in read.csv to make all of them consistent. That is to say, we've made all unrecognized characters into NA. This allows us to eliminate any columns that contain NA, as any such columns could throw off our prediction.
+
+```{r}
+train <- train[,colSums(is.na(train)) == 0]
+final_test <- final_test[,colSums(is.na(final_test)) == 0]
+```
+
+Finally, we note that the data sets contain many superfluous fields that should not be predictive. We therefore choose only those fields which we expect will be predictive of our result field, the "classe" field.
+
+```{r}
+train <- subset(train, select = c(
+                          grep("arm",colnames(train)),
+                          grep("dumbell",colnames(train)),
+                          grep("belt",colnames(train)),
+                          grep("classe",colnames(train))
+                          )
+)
+
+final_test <- subset(final_test, select = c(
+                          grep("arm",colnames(final_test)),
+                          grep("dumbell",colnames(final_test)),
+                          grep("belt",colnames(final_test)),
+                          grep("classe",colnames(final_test))
+                          )
+)
+```
+
+###### Partitioning Data
+
+Before we fit our model, we use the caret package to partition the training data set into sub-training and sub-testing sets for the purpose of cross-validation.
+
+```{r}
+library(caret)
+set.seed(1234)
+inTrain <- createDataPartition(y=train$classe,
+                               p=0.7, list=FALSE)
+training <- train[inTrain,]
+testing <- train[-inTrain,]
+```
+
+#### Prediction
+
+###### Random Forest Model Fitting
+
+We fit a random forest model to our sub-training data set using the randomForest package. We then use the model to make predictions on the sub-testing data.
+
+```{r}
+library(randomForest)
+modFit <- randomForest(classe ~., training, method = "class")
+prediction <- predict(modFit, testing, type = "class")
+```
+
+Let's compare our predictions to the actual outcomes in our sub-testing using a confusion matrix.
+
+```{r}
+confusionMatrix(prediction, testing$classe)
+```
+
+The model is 99.58% accurate on the sub-testing set, so our estimate for the out-of-sample error is 0.0042.
+
+###### Final Prediction on Testing Data
+
+Our prediction on the final testing data is as follows.
+
+```{r}
+predict(modFit, final_test, type = "class")
+```
+
+These predictions are 100% correct, as confirmed within the course website.
+
+
+
+
+
+
